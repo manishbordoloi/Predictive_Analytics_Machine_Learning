@@ -1,0 +1,168 @@
+---
+title: "Practical_Machine_Learning_Project_Manish"
+author: "Manish_Bordoloi"
+date: "Monday, August 17, 2015"
+output: html_document
+---
+## Introduction
+
+Wearable computing is quite a buzzword these days not only amongst the tech savvy world but also among the enterprises around the world who wish to mine the data captured by these devices.With the advent of internet of things it has become possible for us to gather the structured and unstructured data stored in these smart devices.
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+This document describes my analysis of my final project which is a part of Coursera John Hopkins University Specialization course known as Practical Machine Learning.The data associated with this project is being obtained from the Human Activity Recognition (HAR) studies conducted by Wallace Ugulino (wugulino at inf dot puc-rio dot br),Eduardo Velloso and Hugo Fuks More information about this can be found from the website here:http://groupware.les.inf.puc-rio.br/har .
+
+## Data
+
+The data for this assignment comes from here, and contains information from belt, forearm, arm, and dumbbell accelerometers. The data are split into a training group (19,622) observations and testing group (20 observations). Participants in this study were asked to do a "Dumbbell Biceps Curl" in five different ways, including using correct form and four common mistakes.
+
+I have used the Caret Package from CRAN for learning the data in the datasets with the help of different machine learning algorithms.
+
+## Method
+
+### Step 1(Import data):
+
+In the study referenced above, the data was obtained by attaching sensors (inertial measurement units) to both study participants, and weights, to measure the motion as exercises were performed. Each participant was instructed to perform an exercise five different ways (one "correct" way and differnt "incorrect" ways).
+
+In this step, we have tried to download the training dataset file from the internet source.Therafter,I have split the training dataset into 70/30 subsamples for cross validation.The below code is being used to execute the above mentioned steps  
+
+```
+set.seed(614)
+library(ggplot2)
+library(caret)
+if (!file.exists("./data/pml-testing.csv"))
+  {
+  download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","./pml-testing.csv")
+}
+data = read.csv("./pml-training.csv", na.strings = c("NA", ""))
+inTrain = createDataPartition(y=data$classe, p=0.7, list=FALSE)
+training = data[inTrain,]
+testing = data[-inTrain,]
+
+```
+Note: In this project,I have used 70 percent subsample to train the model and the 30 per cent is being used for cross validation.I have tried the other cross validation methods like K-folds but the cross validation methods take more execution time and accuracy remains quite the same.Hence,I have selected simple validation process.
+
+I have then used the below code snippet to have a overview of the data set and the number of available variable or dimensions as the summary of the prediction variable **classe**.It represents which different categories of doing exercise.
+
+```
+dim(training)
+summary(training$classe)
+
+```
+
+## Step 2:(Figuring out if there is any missing value or NAs in the training dataset)
+
+In this step,I have written a function to find out the count of NAs in the training dataset and used sapply function to apply this custom made function on the training dataset.Table function was thereafter used on the object we have got after the execution of the sapply function.Below is the code snippet for the same :
+
+```
+na_test = sapply(training, function(x) {sum(is.na(x))})
+table(na_test)
+
+```
+I have found that there are around 60 variables or columns without a single NAs and 100 columns of the training data set having a NAs or missing values.This is done because I have used the random forest model to create a prediction model and random forest algorithm has a pre-condition not to have missing value to create a accurate model.With this goal in my mind,I have tried to remove those variables from the dataset which contains lots of missing values.Please find the code snippet used to do so:
+
+```
+bad_columns = names(na_test[na_test==13435])
+training = training[, !names(training) %in% bad_columns]
+
+```
+Then,I have tried looking at the structure of the dataset training again and have found that first 7 columns are not the readings of neither accelerometer nor gyroscope and hence these columns can be eleminated as I think the accelerometer and gyroscope readings should be the most important factors or variables influencing the predictive model.
+
+```
+training = training[,-c(1:7)]
+
+```
+## Step 3:(Applying Random Forest Algorithm)
+
+This is the penultimate step of the assignment and herein,I have applied the random forest algorithm to learn from the training dataset and predict the value of our target variable i.e. **classe**.
+
+The model found by me here predicts the classe variable with the help of the all the other 59 variables left out in the training data set.Below the code snippet for the same:
+
+```
+model = train(classe~., method="rf", data=training)
+saveRDS(model, "rfmodel.RDS")
+model = readRDS("rfmodel.RDS")
+```
+Note:I have created the RDS file for the model as this RDS file will the capture model for future use and later we want to run the model again on some other training dataset to get the predicted value of classe then it is not required run the whole modelling related code snippet again.This procedure also saves time and lots of computing power of the machines used.
+
+## Step 4:(Cross validation and applying model on testing data set)
+
+This is the final step in this assignment and involves two sub processes:
+
+      1.Using the testing data set created after partitioning for cross validation and I have found that accuracy on 
+           this testing dataset shows an accuracy of 98.83 %.Below is the code snippet for the same:
+        ```
+        mean(predict(model, testing) == testing$classe) * 100
+        
+        ```
+      
+      2.Finally,I have applied the model on the testing dataset provided and tried applying the model on it.I have
+            used the function confusionMatrix to find out the accuracy of the model and helps us know if there is any 
+            overfitting in the model.
+        
+        ```
+        testing1 <- read.csv("./pml-testing.csv", na.strings = c("NA", ""))
+        predictions <- predict(model,newdata=testing1)
+        confusionMatrix(predictions,testing1$classe)
+        
+        ```
+        
+Result for confusionMatrix:
+----------------------------
+```
+Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 5579    4    0    0    0
+         B    0 3793    2    0    0
+         C    1    0 3420   19    2
+         D    0    0    0 3197    0
+         E    0    0    0    0 3605
+
+Overall Statistics
+                                          
+               Accuracy : 0.9986          
+                 95% CI : (0.9979, 0.9991)
+    No Information Rate : 0.2844          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.9982          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.9998   0.9989   0.9994   0.9941   0.9994
+Specificity            0.9997   0.9999   0.9986   1.0000   1.0000
+Pos Pred Value         0.9993   0.9995   0.9936   1.0000   1.0000
+Neg Pred Value         0.9999   0.9997   0.9999   0.9988   0.9999
+Prevalence             0.2844   0.1935   0.1744   0.1639   0.1838
+Detection Rate         0.2843   0.1933   0.1743   0.1629   0.1837
+Detection Prevalence   0.2845   0.1934   0.1754   0.1629   0.1837
+Balanced Accuracy      0.9998   0.9994   0.9990   0.9970   0.9997
+
+```
+## Creation of text files for assignment submission
+
+Thereafter,we have written the custom function which generates text files with the predicted classe value for first 20 test case required for assignment submission.As directed,I have initially changed the data type of the predictions object into characters.Please find below the code snippet:
+
+```
+prediction <- as.character(predictions)
+
+pml_write_files = function(x){
+  n = 20
+  for(i in 1:n){
+    filename = paste0("./problem_id_", i, ".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+pml_write_files(prediction)
+
+```
+
+
+
+
+
+
